@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Förderideen</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f5f5f5;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 24px 28px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      }
+
+      h1 {
+        margin-top: 0;
+        font-size: 1.8rem;
+        color: #1f2933;
+      }
+
+      p.description {
+        color: #4b5563;
+        margin-bottom: 24px;
+      }
+
+      .form-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .form-group {
+        flex: 1 1 220px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 4px;
+      }
+
+      input[type="text"],
+      select,
+      textarea {
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+        font-size: 0.95rem;
+        font-family: inherit;
+        box-sizing: border-box;
+      }
+
+      textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+
+      button {
+        padding: 10px 18px;
+        border-radius: 8px;
+        border: none;
+        background: #2563eb;
+        color: white;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        background: #9ca3af;
+        cursor: default;
+      }
+
+      .buttons {
+        margin-top: 12px;
+      }
+
+      .result {
+        margin-top: 24px;
+        padding: 16px;
+        border-radius: 8px;
+        background: #f3f4ff;
+        border: 1px solid #c7d2fe;
+        white-space: pre-wrap;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        font-size: 0.95rem;
+      }
+
+      .error {
+        margin-top: 12px;
+        color: #b91c1c;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Förderideen Generator</h1>
+      <p class="description">
+        Wähle Bereich und Kompetenz, beschreibe deine Beobachtung, und erhalte
+        ausgearbeitete Förderideen auf Basis der Wissensbasis.
+      </p>
+
+      <form id="beokiz-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="alter">Alter des Kindes (z.B. 3;4)</label>
+            <input type="text" id="alter" name="alter" placeholder="z.B. 3;4" />
+          </div>
+
+          <div class="form-group">
+            <label for="kontext">Kontext</label>
+            <select id="kontext" name="kontext">
+              <option value="Kita">Kita</option>
+              <option value="Elternhaus">Zuhause</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="bereich">Bereich</label>
+            <select id="bereich" name="bereich">
+              <option value="">Bitte wählen...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="kompetenz">Kompetenz</label>
+            <select id="kompetenz" name="kompetenz" disabled>
+              <option value="">Bitte zuerst Bereich wählen...</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="beobachtung">Beobachtung (frei formuliert)</label>
+          <textarea
+            id="beobachtung"
+            name="beobachtung"
+            placeholder="Beschreibe kurz deine Beobachtung zum Kind..."
+          ></textarea>
+        </div>
+
+        <div class="buttons">
+          <button type="submit" id="submit-btn">Förderideen generieren</button>
+        </div>
+
+        <div class="error" id="error"></div>
+      </form>
+
+      <div id="result" class="result" style="display: none"></div>
+    </div>
+
+    <script>
+      const bereichSelect = document.getElementById("bereich");
+      const kompetenzSelect = document.getElementById("kompetenz");
+      const form = document.getElementById("beokiz-form");
+      const resultDiv = document.getElementById("result");
+      const errorDiv = document.getElementById("error");
+      const submitBtn = document.getElementById("submit-btn");
+
+      async function loadBereiche() {
+        try {
+          const resp = await fetch("/bereiche");
+          if (!resp.ok) {
+            throw new Error("Fehler beim Laden der Bereiche");
+          }
+          const data = await resp.json();
+          bereichSelect.innerHTML = '<option value="">Bitte wählen...</option>';
+          (data.bereiche || []).forEach((b) => {
+            const opt = document.createElement("option");
+            opt.value = b;
+            opt.textContent = b;
+            bereichSelect.appendChild(opt);
+          });
+        } catch (err) {
+          console.error(err);
+          errorDiv.textContent = "Fehler beim Laden der Bereiche.";
+        }
+      }
+
+      async function loadKompetenzenForBereich(bereich) {
+        kompetenzSelect.innerHTML = "";
+        kompetenzSelect.disabled = true;
+
+        if (!bereich) {
+          kompetenzSelect.innerHTML =
+            '<option value="">Bitte zuerst Bereich wählen...</option>';
+          return;
+        }
+
+        try {
+          const resp = await fetch(
+            "/kompetenzen?bereich=" + encodeURIComponent(bereich),
+          );
+          if (!resp.ok) {
+            throw new Error("Fehler beim Laden der Kompetenzen");
+          }
+          const data = await resp.json();
+          const list = data.kompetenzen || [];
+          if (list.length === 0) {
+            kompetenzSelect.innerHTML =
+              '<option value="">Keine Kompetenzen gefunden</option>';
+            return;
+          }
+
+          kompetenzSelect.disabled = false;
+          kompetenzSelect.innerHTML = "";
+
+          list.forEach((item) => {
+            const opt = document.createElement("option");
+            opt.value = item.code; // wird als kompetenz_code an die API geschickt
+            opt.textContent = item.label;
+            kompetenzSelect.appendChild(opt);
+          });
+        } catch (err) {
+          console.error(err);
+          errorDiv.textContent = "Fehler beim Laden der Kompetenzen.";
+        }
+      }
+
+      bereichSelect.addEventListener("change", (e) => {
+        const bereich = e.target.value;
+        loadKompetenzenForBereich(bereich);
+      });
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorDiv.textContent = "";
+        resultDiv.style.display = "none";
+        resultDiv.textContent = "";
+
+        const alter = document.getElementById("alter").value.trim();
+        const kontext = document.getElementById("kontext").value;
+        const bereich = bereichSelect.value;
+        const kompetenz_code = kompetenzSelect.value;
+        const beobachtung = document.getElementById("beobachtung").value.trim();
+
+        if (!bereich || !kompetenz_code || !beobachtung) {
+          errorDiv.textContent =
+            "Bitte Bereich, Kompetenz und Beobachtung ausfüllen.";
+          return;
+        }
+
+        const payload = {
+          alter,
+          bereich,
+          kompetenz_code,
+          kontext,
+          beobachtung,
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Generiere...";
+
+        try {
+          const resp = await fetch("/generate", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          let data = null;
+          try {
+            data = await resp.json();
+          } catch (parseErr) {
+            console.error("Fehler beim Parsen der Antwort:", parseErr);
+          }
+
+          if (!resp.ok) {
+            const msg =
+              (data && data.error) ||
+              `Fehler bei der Generierung (Status ${resp.status}).`;
+            throw new Error(msg);
+          }
+
+          const text =
+            data && typeof data.text === "string"
+              ? data.text
+              : "(Keine Antwort erhalten)";
+          resultDiv.textContent = text;
+          resultDiv.style.display = "block";
+        } catch (err) {
+          console.error(err);
+          errorDiv.textContent =
+            err.message || "Ein unbekannter Fehler ist aufgetreten.";
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Förderideen generieren";
+        }
+      });
+
+      // Beim Laden der Seite: Bereiche holen
+      loadBereiche();
+    </script>
+  </body>
+</html>
