@@ -3,14 +3,17 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import pandas as pd
-import traceback
 import os
+import traceback  # pour le logging des erreurs
 
 from openai import OpenAI, OpenAIError, RateLimitError
 
 # --- Initialisation du client OpenAI (lit OPENAI_API_KEY dans l'environnement) ---
-client = OpenAI()
+api_key = os.getenv("OPENAI_API_KEY")
+print("DEBUG OPENAI_API_KEY est définie :", bool(api_key))
+client = OpenAI(api_key=api_key)
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+
 
 app = FastAPI()
 
