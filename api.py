@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import pandas as pd
+import traceback
 import os
 
 from openai import OpenAI, OpenAIError, RateLimitError
@@ -205,7 +206,10 @@ async def generate(req: GenerateRequest):
         answer = completion.choices[0].message.content
         return {"text": answer}
 
-    except RateLimitError:
+    except RateLimitError as e:
+        # Log interne pour le debug (apparaitra dans les logs Render)
+        print("RateLimitError in /generate:", repr(e))
+        traceback.print_exc()
         return JSONResponse(
             status_code=429,
             content={
@@ -215,8 +219,10 @@ async def generate(req: GenerateRequest):
                 )
             },
         )
-    except OpenAIError:
-        # Pas de details de l'exception pour eviter les problemes d'encodage
+    except OpenAIError as e:
+        # Log interne
+        print("OpenAIError in /generate:", repr(e))
+        traceback.print_exc()
         return JSONResponse(
             status_code=502,
             content={
@@ -226,8 +232,10 @@ async def generate(req: GenerateRequest):
                 )
             },
         )
-    except Exception:
-        # Ne pas injecter {e} dans la reponse pour eviter les erreurs 'ascii' codec
+    except Exception as e:
+        # Log interne pour toute autre erreur
+        print("Unexpected error in /generate:", repr(e))
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={
@@ -237,3 +245,4 @@ async def generate(req: GenerateRequest):
                 )
             },
         )
+
